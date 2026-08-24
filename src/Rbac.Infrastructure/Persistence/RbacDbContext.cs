@@ -63,5 +63,14 @@ public class RbacDbContext : DbContext, IRbacDbContext
         modelBuilder.Entity<RbacTenant>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<RbacScope>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<RbacResource>().HasQueryFilter(e => !e.IsDeleted);
+
+        // Join rows must repeat the principal filters. Otherwise EF warns that a
+        // required navigation can return null when the principal is soft-deleted.
+        modelBuilder.Entity<UserRole>().HasQueryFilter(e => !e.User.IsDeleted && !e.Role.IsDeleted);
+        modelBuilder.Entity<RolePermission>().HasQueryFilter(e => !e.Role.IsDeleted && !e.Permission.IsDeleted);
+        modelBuilder.Entity<UserPermission>().HasQueryFilter(e => !e.User.IsDeleted && !e.Permission.IsDeleted);
+        modelBuilder.Entity<ProgramPermission>().HasQueryFilter(e => !e.Program.IsDeleted && !e.Permission.IsDeleted);
+        modelBuilder.Entity<UserTenant>().HasQueryFilter(e => !e.User.IsDeleted && !e.Tenant.IsDeleted);
+        modelBuilder.Entity<RoleTenant>().HasQueryFilter(e => !e.Role.IsDeleted && !e.Tenant.IsDeleted);
     }
 }

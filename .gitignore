@@ -24,6 +24,7 @@ coverage*.xml
 *.db-wal
 *.sqlite
 *.sqlite3
+dataprotection-keys/
 
 ## Node
 node_modules/

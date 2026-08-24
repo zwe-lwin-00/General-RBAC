@@ -7,8 +7,9 @@ services:
       dockerfile: docker/api.Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_HTTP_PORTS: "8080"
       ConnectionStrings__Sqlite: Data Source=/app/data/rbac.sample.db
+      DataProtection__KeysPath: /app/data/dataprotection-keys
     volumes:
       - rbac-data:/app/data
     ports:

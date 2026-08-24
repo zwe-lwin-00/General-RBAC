@@ -26,9 +26,10 @@ COPY --from=build /app/publish .
 RUN chown -R $APP_UID:$APP_UID /app
 USER $APP_UID
 
-ENV ASPNETCORE_URLS=http://+:8080 \
+ENV ASPNETCORE_HTTP_PORTS=8080 \
     ASPNETCORE_ENVIRONMENT=Production \
-    ConnectionStrings__Sqlite="Data Source=/app/data/rbac.sample.db"
+    ConnectionStrings__Sqlite="Data Source=/app/data/rbac.sample.db" \
+    DataProtection__KeysPath=/app/data/dataprotection-keys
 
 EXPOSE 8080
 HEALTHCHECK --interval=5s --timeout=5s --start-period=40s --retries=12 \

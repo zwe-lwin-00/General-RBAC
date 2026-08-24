@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Rbac.Infrastructure.Persistence;
 using Rbac.Infrastructure.Seed;
 
@@ -11,6 +12,8 @@ public class SeedAndSchemaTests
     {
         var options = new DbContextOptionsBuilder<RbacDbContext>()
             .UseInMemoryDatabase("rbac-infra-" + Guid.NewGuid().ToString("N"))
+            .ConfigureWarnings(w => w.Throw(
+                CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning))
             .Options;
         await using var db = new RbacDbContext(options);
         await db.Database.EnsureCreatedAsync();

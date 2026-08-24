@@ -1,7 +1,10 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.IdentityModel.Tokens;
 using Rbac.AspNetCore;
 using Rbac.AspNetCore.Authorization;
@@ -13,6 +16,17 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<DemoAuthOptions>(builder.Configuration.GetSection("DemoAuth"));
 var demoAuth = builder.Configuration.GetSection("DemoAuth").Get<DemoAuthOptions>() ?? new DemoAuthOptions();
 var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(demoAuth.SigningKey));
+
+var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"]
+    ?? Path.Combine(builder.Environment.ContentRootPath, "dataprotection-keys");
+Directory.CreateDirectory(dataProtectionKeysPath);
+var dataProtectionCert = SampleDataProtection.LoadOrCreateCertificate(
+    Path.Combine(dataProtectionKeysPath, "dataprotection.pfx"),
+    demoAuth.SigningKey);
+builder.Services.AddDataProtection()
+    .SetApplicationName("Rbac.Sample.Api")
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath))
+    .ProtectKeysWithCertificate(dataProtectionCert);
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -290,5 +304,29 @@ internal static class PassengerStore
         {
             return Items.RemoveAll(p => p.Id == id) > 0;
         }
+    }
+}
+
+internal static class SampleDataProtection
+{
+    public static X509Certificate2 LoadOrCreateCertificate(string path, string password)
+    {
+        if (File.Exists(path))
+        {
+            return new X509Certificate2(path, password, X509KeyStorageFlags.EphemeralKeySet);
+        }
+
+        using var rsa = RSA.Create(2048);
+        var request = new CertificateRequest(
+            "CN=Rbac.Sample.Api",
+            rsa,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1);
+        using var created = request.CreateSelfSigned(
+            DateTimeOffset.UtcNow.AddDays(-1),
+            DateTimeOffset.UtcNow.AddYears(5));
+        var pfx = created.Export(X509ContentType.Pfx, password);
+        File.WriteAllBytes(path, pfx);
+        return new X509Certificate2(pfx, password, X509KeyStorageFlags.EphemeralKeySet);
     }
 }
