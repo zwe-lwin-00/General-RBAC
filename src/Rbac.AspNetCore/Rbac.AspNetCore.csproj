@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Rbac.AspNetCore</PackageId>
+    <Description>ASP.NET Core authorization attributes, handlers, and optional admin APIs for RBAC.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Rbac.Application\Rbac.Application.csproj" />
+    <ProjectReference Include="..\Rbac.Infrastructure\Rbac.Infrastructure.csproj" />
+    <ProjectReference Include="..\Rbac.Contracts\Rbac.Contracts.csproj" />
+  </ItemGroup>
+</Project>

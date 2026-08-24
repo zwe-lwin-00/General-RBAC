@@ -1,0 +1,19 @@
+{
+  "name": "@general-rbac/react",
+  "version": "1.0.0",
+  "description": "React helpers for permission-centric RBAC: provider, hooks, guards, and menu rendering.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "peerDependencies": {
+    "react": "^19.2.8",
+    "react-router-dom": "^7.18.2"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "typescript": "~6.0.2"
+  }
+}

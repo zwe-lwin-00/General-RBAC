@@ -1,0 +1,52 @@
+## Build
+bin/
+obj/
+[Bb]uild/
+[Ll]og/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+.idea/
+*.DotSettings.user
+
+## Tests / coverage
+TestResults/
+coverage/
+coverage*.xml
+*.coverage
+*.coveragexml
+
+## Data
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+## Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+.npm
+.cache/
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Secrets / env
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+
+## Logs
+*.log
+npm-debug.log*
+
+## Publish
+publish/
+artifacts/

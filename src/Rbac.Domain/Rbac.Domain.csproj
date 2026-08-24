@@ -1,0 +1,7 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Rbac.Domain</PackageId>
+    <Description>Permission-centric RBAC domain model. Authentication is intentionally out of scope.</Description>
+  </PropertyGroup>
+</Project>

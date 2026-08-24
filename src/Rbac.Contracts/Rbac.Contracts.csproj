@@ -1,0 +1,7 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Rbac.Contracts</PackageId>
+    <Description>Public DTOs and request/response contracts for the RBAC framework.</Description>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <Authors>zwe-lwin-00</Authors>
+    <Company>General RBAC</Company>
+    <Product>General RBAC</Product>
+    <RepositoryUrl>https://github.com/zwe-lwin-00/General-RBAC</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/zwe-lwin-00/General-RBAC</PackageProjectUrl>
+    <PackageTags>rbac;authorization;permissions;aspnetcore;security</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+</Project>
