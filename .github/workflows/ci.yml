@@ -28,3 +28,20 @@ jobs:
         working-directory: samples/Rbac.Sample.React
       - run: npm run build
         working-directory: samples/Rbac.Sample.React
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build images
+        run: docker compose build
+      - name: Start stack
+        run: docker compose up -d --wait --wait-timeout 120
+      - name: Check API through nginx and published port
+        run: |
+          curl -fsS http://localhost:8080/api/health
+          curl -fsS http://localhost:5265/api/health
+          curl -fsS -o /dev/null -w "%{http_code}" http://localhost:8080/ | grep -q 200
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v

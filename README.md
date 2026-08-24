@@ -41,7 +41,22 @@ database/sqlserver         canonical SQL Server script
 docs/                      architecture and ERD
 ```
 
-## Quick start (sample)
+## Quick start (Docker)
+
+```bash
+docker compose up --build
+# or: make docker
+```
+
+Open http://localhost:8080 — nginx serves the React console and proxies `/api` to the .NET API.
+
+```bash
+docker compose down
+```
+
+Details: [`docker/README.md`](docker/README.md)
+
+## Quick start (local SDK)
 
 ```bash
 # API (SQLite file rbac.sample.db is created automatically)
@@ -147,11 +162,8 @@ A menu item linked to a program is shown only if the user has **any global** per
 
 Production schema: [`database/sqlserver/001_create_schema.sql`](database/sqlserver/001_create_schema.sql)
 
-Docker:
-
 ```bash
-docker compose -f docker/docker-compose.yml up -d
-# then set ConnectionStrings:SqlServer in the sample
+docker compose -f docker-compose.yml -f docker/docker-compose.sqlserver.yml up --build
 ```
 
 ## Tests
