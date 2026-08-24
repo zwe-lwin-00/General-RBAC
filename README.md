@@ -131,13 +131,17 @@ Load `/api/rbac/me` after login and pass `permissions` + `menus` into `RbacProvi
 
 ## Authorization rules
 
-Default deny.
+Default deny. Fail closed.
 
 ```text
 User DENY → User ALLOW → Role DENY → Role ALLOW → DENY
 ```
 
-A menu item linked to a program is shown only if the user has **any** permission on that program. Groups show when a child is visible. Dashboard-style items with no program are visible to any authenticated user.
+Unscoped API checks match **only global grants**. A scoped grant (one airport, one department) does not authorize a global endpoint.
+
+Administration is least-privilege: callers can only assign permissions they already hold. System roles cannot be rewritten, deactivated, or assigned except by a system administrator. The last system admin cannot be removed.
+
+A menu item linked to a program is shown only if the user has **any global** permission on that program. See [`docs/security.md`](docs/security.md).
 
 ## SQL Server
 

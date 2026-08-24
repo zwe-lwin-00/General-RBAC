@@ -18,6 +18,9 @@ public sealed class RbacOptions
 
     public string AdminApiPrefix { get; set; } = "/api/rbac";
 
-    /// <summary>When true, unmapped authenticated principals are rejected by permission checks.</summary>
+    /// <summary>
+    /// Permission checks always require a mapped, active RBAC user (fail closed).
+    /// Unmapped principals receive 403, never an implicit allow.
+    /// </summary>
     public bool RequireMappedUser { get; set; } = true;
 }

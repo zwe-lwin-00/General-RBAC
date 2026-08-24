@@ -70,25 +70,26 @@ public static class AuthorizationEvaluator
 
     public static IReadOnlySet<string> ComputeEffectiveAllows(
         IReadOnlyCollection<PermissionGrant> userGrants,
-        IReadOnlyCollection<PermissionGrant> roleGrants)
+        IReadOnlyCollection<PermissionGrant> roleGrants,
+        Guid? requiredScopeId = null)
     {
         var allows = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var grant in roleGrants.Where(g => g.Effect == PermissionEffect.Allow))
+        foreach (var grant in roleGrants.Where(g => g.Effect == PermissionEffect.Allow && PrivilegeRules.ScopeMatches(g.ScopeId, requiredScopeId)))
         {
             allows.Add(grant.PermissionCode);
         }
 
-        foreach (var grant in roleGrants.Where(g => g.Effect == PermissionEffect.Deny))
+        foreach (var grant in roleGrants.Where(g => g.Effect == PermissionEffect.Deny && PrivilegeRules.ScopeMatches(g.ScopeId, requiredScopeId)))
         {
             allows.Remove(grant.PermissionCode);
         }
 
-        foreach (var grant in userGrants.Where(g => g.Effect == PermissionEffect.Allow))
+        foreach (var grant in userGrants.Where(g => g.Effect == PermissionEffect.Allow && PrivilegeRules.ScopeMatches(g.ScopeId, requiredScopeId)))
         {
             allows.Add(grant.PermissionCode);
         }
 
-        foreach (var grant in userGrants.Where(g => g.Effect == PermissionEffect.Deny))
+        foreach (var grant in userGrants.Where(g => g.Effect == PermissionEffect.Deny && PrivilegeRules.ScopeMatches(g.ScopeId, requiredScopeId)))
         {
             allows.Remove(grant.PermissionCode);
         }
@@ -96,10 +97,6 @@ public static class AuthorizationEvaluator
         return allows;
     }
 
-    /// <summary>
-    /// A request with no scope is satisfied by any grant of that permission.
-    /// A scoped request is satisfied by a global (ALL) grant or an exact scope match.
-    /// </summary>
     private static bool Matches(PermissionGrant grant, string requiredCode, Guid? requiredScopeId)
     {
         if (!string.Equals(grant.PermissionCode, requiredCode, StringComparison.OrdinalIgnoreCase))
@@ -107,11 +104,6 @@ public static class AuthorizationEvaluator
             return false;
         }
 
-        if (requiredScopeId is null)
-        {
-            return true;
-        }
-
-        return grant.ScopeId is null || grant.ScopeId == requiredScopeId;
+        return PrivilegeRules.ScopeMatches(grant.ScopeId, requiredScopeId);
     }
 }

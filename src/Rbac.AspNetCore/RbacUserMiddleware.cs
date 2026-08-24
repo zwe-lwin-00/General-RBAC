@@ -12,6 +12,7 @@ namespace Rbac.AspNetCore;
 public sealed class RbacUserMiddleware
 {
     public const string ItemKey = "Rbac.UserId";
+    public const string ActiveKey = "Rbac.UserActive";
     private readonly RequestDelegate _next;
 
     public RbacUserMiddleware(RequestDelegate next) => _next = next;
@@ -27,9 +28,10 @@ public sealed class RbacUserMiddleware
             if (!string.IsNullOrWhiteSpace(externalId))
             {
                 var user = await resolver.FindByExternalIdAsync(externalId, context.RequestAborted);
-                if (user is not null)
+                if (user is not null && user.IsActive)
                 {
                     context.Items[ItemKey] = user.Id;
+                    context.Items[ActiveKey] = true;
                 }
             }
         }

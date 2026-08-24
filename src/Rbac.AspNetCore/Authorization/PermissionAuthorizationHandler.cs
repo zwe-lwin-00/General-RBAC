@@ -28,32 +28,34 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
         AuthorizationHandlerContext context,
         PermissionRequirement requirement)
     {
-        var externalId = context.User.FindExternalId(_options);
-        if (string.IsNullOrWhiteSpace(externalId))
+        try
         {
-            return;
-        }
-
-        var user = await _users.FindByExternalIdAsync(externalId);
-        if (user is null)
-        {
-            if (!_options.RequireMappedUser)
+            if (string.IsNullOrWhiteSpace(requirement.Permission))
             {
                 return;
             }
 
-            return;
-        }
+            var externalId = context.User.FindExternalId(_options);
+            if (string.IsNullOrWhiteSpace(externalId))
+            {
+                return;
+            }
 
-        if (!user.IsActive)
-        {
-            return;
-        }
+            var user = await _users.FindByExternalIdAsync(externalId);
+            if (user is null || !user.IsActive)
+            {
+                return;
+            }
 
-        var decision = await _authorization.AuthorizeAsync(user.Id, requirement.Permission);
-        if (decision.IsAllowed)
+            var decision = await _authorization.AuthorizeAsync(user.Id, requirement.Permission.Trim());
+            if (decision.IsAllowed)
+            {
+                context.Succeed(requirement);
+            }
+        }
+        catch
         {
-            context.Succeed(requirement);
+            // Fail closed. Do not succeed the requirement.
         }
     }
 }
@@ -95,15 +97,20 @@ public sealed class HttpRbacActor : IRbacActor
     public string? Name =>
         _http.HttpContext?.User.Identity?.Name
         ?? _http.HttpContext?.User.FindExternalId(_options)
-        ?? "system";
+        ?? "unmapped";
 
-    public Guid? UserId => null;
+    public Guid? UserId =>
+        _http.HttpContext?.Items.TryGetValue(Rbac.AspNetCore.RbacUserMiddleware.ItemKey, out var value) == true && value is Guid id
+            ? id
+            : null;
 
     public string? IpAddress => _http.HttpContext?.Connection.RemoteIpAddress?.ToString();
 
     public string? CorrelationId =>
         _http.HttpContext?.TraceIdentifier
         ?? _http.HttpContext?.Request.Headers["X-Correlation-ID"].FirstOrDefault();
+
+    public bool IsSystemProcess => false;
 }
 
 public static class EndpointConventionBuilderExtensions

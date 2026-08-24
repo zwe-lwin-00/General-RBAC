@@ -36,6 +36,7 @@ public static class RbacServiceCollectionExtensions
         services.AddRbacInfrastructure(infrastructure);
         services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
         services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddSingleton<IAuthorizationMiddlewareResultHandler, RbacAuthorizationResultHandler>();
         return services;
     }
 

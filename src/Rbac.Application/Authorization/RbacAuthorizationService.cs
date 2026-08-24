@@ -39,27 +39,35 @@ public sealed class RbacAuthorizationService : IRbacAuthorizationService
         AuthorizationContext? context = null,
         CancellationToken cancellationToken = default)
     {
-        var snapshot = await LoadSnapshotAsync(userId, cancellationToken);
-        if (snapshot is null)
+        try
         {
-            return AuthorizationDecision.Deny(permissionCode, "User was not found.");
+            var snapshot = await LoadSnapshotAsync(userId, cancellationToken);
+            if (snapshot is null)
+            {
+                return AuthorizationDecision.Deny(permissionCode, "User was not found.");
+            }
+
+            var decision = AuthorizationEvaluator.Evaluate(
+                snapshot.IsActive,
+                snapshot.UserGrants,
+                snapshot.RoleGrants,
+                permissionCode.Trim(),
+                context?.ScopeId);
+
+            _logger.LogDebug(
+                "Authorization {Decision} for user {UserId} permission {Permission}: {Reason}",
+                decision.IsAllowed ? "ALLOW" : "DENY",
+                userId,
+                permissionCode,
+                decision.Reason);
+
+            return decision;
         }
-
-        var decision = AuthorizationEvaluator.Evaluate(
-            snapshot.IsActive,
-            snapshot.UserGrants,
-            snapshot.RoleGrants,
-            permissionCode,
-            context?.ScopeId);
-
-        _logger.LogDebug(
-            "Authorization {Decision} for user {UserId} permission {Permission}: {Reason}",
-            decision.IsAllowed ? "ALLOW" : "DENY",
-            userId,
-            permissionCode,
-            decision.Reason);
-
-        return decision;
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Authorization failed closed for user {UserId}", userId);
+            return AuthorizationDecision.Deny(permissionCode, "Authorization error.");
+        }
     }
 
     public async Task<IReadOnlySet<string>> GetEffectivePermissionsAsync(
@@ -84,17 +92,7 @@ public sealed class RbacAuthorizationService : IRbacAuthorizationService
 
         IReadOnlyCollection<PermissionGrant> userGrants = snapshot.UserGrants;
         IReadOnlyCollection<PermissionGrant> roleGrants = snapshot.RoleGrants;
-        if (context?.ScopeId is not null)
-        {
-            userGrants = snapshot.UserGrants
-                .Where(g => g.ScopeId is null || g.ScopeId == context.ScopeId)
-                .ToList();
-            roleGrants = snapshot.RoleGrants
-                .Where(g => g.ScopeId is null || g.ScopeId == context.ScopeId)
-                .ToList();
-        }
-
-        var effective = AuthorizationEvaluator.ComputeEffectiveAllows(userGrants, roleGrants);
+        var effective = AuthorizationEvaluator.ComputeEffectiveAllows(userGrants, roleGrants, context?.ScopeId);
         if (context?.ScopeId is null)
         {
             await _cache.SetAsync(userId, effective, cancellationToken);

@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Rbac.Application;
 using Rbac.Application.Abstractions;
 using Rbac.AspNetCore.Authorization;
 using Rbac.Contracts;
@@ -12,13 +15,18 @@ public static class RbacApiEndpointExtensions
 {
     public static IEndpointRouteBuilder MapRbacApi(this IEndpointRouteBuilder app, string prefix = "/api/rbac")
     {
+        var enableAdmin = app.ServiceProvider.GetService<IOptions<RbacOptions>>()?.Value.EnableAdminApi ?? true;
         var api = app.MapGroup(prefix).WithTags("RBAC");
         MapMe(api);
-        MapUsers(api);
-        MapRoles(api);
-        MapPermissions(api);
-        MapPrograms(api);
-        MapMenus(api);
+        if (enableAdmin)
+        {
+            MapUsers(api);
+            MapRoles(api);
+            MapPermissions(api);
+            MapPrograms(api);
+            MapMenus(api);
+        }
+
         return app;
     }
 

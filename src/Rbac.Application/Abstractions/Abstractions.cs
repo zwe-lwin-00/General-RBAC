@@ -59,6 +59,7 @@ public interface IPermissionCache
     Task SetAsync(Guid userId, IReadOnlySet<string> permissions, CancellationToken cancellationToken = default);
     Task RemoveAsync(Guid userId, CancellationToken cancellationToken = default);
     Task RemoveUsersAsync(IEnumerable<Guid> userIds, CancellationToken cancellationToken = default);
+    Task InvalidateAllAsync(CancellationToken cancellationToken = default);
 }
 
 public interface IAuditWriter
@@ -78,6 +79,11 @@ public interface IRbacActor
     Guid? UserId { get; }
     string? IpAddress { get; }
     string? CorrelationId { get; }
+
+    /// <summary>
+    /// True for seed/tests/background jobs. HTTP callers must never be a system process.
+    /// </summary>
+    bool IsSystemProcess { get; }
 }
 
 public interface IRbacUserResolver

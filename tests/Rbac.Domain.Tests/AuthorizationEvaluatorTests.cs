@@ -141,4 +141,63 @@ public class AuthorizationEvaluatorTests
         Assert.Contains("passenger.read", effective);
         Assert.DoesNotContain("report.export", effective);
     }
+
+    [Fact]
+    public void Unscoped_request_is_not_satisfied_by_scoped_grant()
+    {
+        var yangon = Guid.NewGuid();
+        var decision = AuthorizationEvaluator.Evaluate(
+            true,
+            [],
+            [new PermissionGrant("passenger.read", PermissionEffect.Allow, yangon)],
+            "passenger.read");
+        Assert.False(decision.IsAllowed);
+        Assert.Equal("Default deny.", decision.Reason);
+    }
+
+    [Fact]
+    public void Effective_allows_ignore_scoped_grants_when_unscoped()
+    {
+        var yangon = Guid.NewGuid();
+        var effective = AuthorizationEvaluator.ComputeEffectiveAllows(
+            [],
+            [new PermissionGrant("passenger.read", PermissionEffect.Allow, yangon)]);
+        Assert.DoesNotContain("passenger.read", effective);
+    }
+}
+
+public class PrivilegeRulesTests
+{
+    [Fact]
+    public void Non_admin_cannot_assign_system_role()
+    {
+        var held = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "passenger.read" };
+        Assert.False(PrivilegeRules.CanAssignRole(false, false, held, true, held));
+    }
+
+    [Fact]
+    public void Non_admin_cannot_grant_unheld_permission()
+    {
+        var held = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "passenger.read" };
+        Assert.False(PrivilegeRules.CanGrantPermission(false, false, held, "passenger.delete"));
+        Assert.True(PrivilegeRules.CanGrantPermission(false, false, held, "passenger.read"));
+    }
+
+    [Fact]
+    public void System_admin_can_grant_any_permission()
+    {
+        Assert.True(PrivilegeRules.CanGrantPermission(
+            false,
+            true,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            "passenger.delete"));
+    }
+
+    [Fact]
+    public void Unscoped_match_requires_global_grant()
+    {
+        Assert.True(PrivilegeRules.ScopeMatches(null, null));
+        Assert.False(PrivilegeRules.ScopeMatches(Guid.NewGuid(), null));
+        Assert.True(PrivilegeRules.ScopeMatches(null, Guid.NewGuid()));
+    }
 }

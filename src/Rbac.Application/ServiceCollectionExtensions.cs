@@ -9,6 +9,7 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddRbacApplication(this IServiceCollection services)
     {
+        services.AddScoped<AssignmentGuard>();
         services.AddScoped<IRbacAuthorizationService, RbacAuthorizationService>();
         services.AddScoped<IUserAdminService, UserAdminService>();
         services.AddScoped<IRoleAdminService, RoleAdminService>();

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Rbac.Application.Abstractions;
 using Rbac.Contracts;
 using Rbac.Domain;
+using Rbac.Domain.Authorization;
 using Rbac.Domain.Entities;
 using Rbac.Domain.Enums;
 using Rbac.Domain.ValueObjects;
@@ -14,13 +15,20 @@ public sealed class UserAdminService : IUserAdminService
     private readonly IPermissionCache _cache;
     private readonly IAuditWriter _audit;
     private readonly IRbacActor _actor;
+    private readonly AssignmentGuard _guard;
 
-    public UserAdminService(IRbacDbContext db, IPermissionCache cache, IAuditWriter audit, IRbacActor actor)
+    public UserAdminService(
+        IRbacDbContext db,
+        IPermissionCache cache,
+        IAuditWriter audit,
+        IRbacActor actor,
+        AssignmentGuard guard)
     {
         _db = db;
         _cache = cache;
         _audit = audit;
         _actor = actor;
+        _guard = guard;
     }
 
     public async Task<PagedResult<UserDto>> ListAsync(string? search, int page, int pageSize, CancellationToken cancellationToken = default)
@@ -101,7 +109,20 @@ public sealed class UserAdminService : IUserAdminService
             return Result.Fail<UserDto>("User not found.", "not_found");
         }
 
+        if (request.DisplayName.Trim().Length == 0)
+        {
+            return Result.Fail<UserDto>("Display name is required.", "validation");
+        }
+
         var old = $"{user.DisplayName}|{user.IsActive}";
+        if (user.IsActive && !request.IsActive)
+        {
+            var lastAdmin = await _guard.EnsureNotLastSystemAdminAsync(id, null, deactivatingOrDeleting: true, cancellationToken);
+            if (!lastAdmin.IsSuccess)
+            {
+                return Result.Fail<UserDto>(lastAdmin.Error!, lastAdmin.ErrorCode);
+            }
+        }
         user.DisplayName = request.DisplayName.Trim();
         user.Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
         user.IsActive = request.IsActive;
@@ -118,6 +139,12 @@ public sealed class UserAdminService : IUserAdminService
         if (user is null)
         {
             return Result.Fail("User not found.", "not_found");
+        }
+
+        var lastAdmin = await _guard.EnsureNotLastSystemAdminAsync(id, null, deactivatingOrDeleting: true, cancellationToken);
+        if (!lastAdmin.IsSuccess)
+        {
+            return lastAdmin;
         }
 
         user.MarkDeleted(_actor.Name);
@@ -137,10 +164,16 @@ public sealed class UserAdminService : IUserAdminService
         }
 
         var unique = roleIds.Distinct().ToList();
-        var validCount = await _db.Roles.CountAsync(r => unique.Contains(r.Id) && !r.IsDeleted, cancellationToken);
-        if (validCount != unique.Count)
+        var assignable = await _guard.EnsureCanAssignRolesAsync(unique, cancellationToken);
+        if (!assignable.IsSuccess)
         {
-            return Result.Fail("One or more roles were not found.", "not_found");
+            return assignable;
+        }
+
+        var lastAdmin = await _guard.EnsureNotLastSystemAdminAsync(userId, unique, deactivatingOrDeleting: false, cancellationToken);
+        if (!lastAdmin.IsSuccess)
+        {
+            return lastAdmin;
         }
 
         var old = string.Join(",", user.UserRoles.Select(r => r.RoleId).OrderBy(x => x));
@@ -187,12 +220,13 @@ public sealed class UserAdminService : IUserAdminService
             return Result.Fail(error, "validation");
         }
 
-        var ids = parsed.Select(a => a.PermissionId).Distinct().ToList();
-        var validCount = await _db.Permissions.CountAsync(p => ids.Contains(p.Id) && !p.IsDeleted, cancellationToken);
-        if (validCount != ids.Count)
+        var grantable = await _guard.EnsureCanGrantPermissionsAsync(parsed, cancellationToken);
+        if (!grantable.IsSuccess)
         {
-            return Result.Fail("One or more permissions were not found.", "not_found");
+            return grantable;
         }
+
+        var ids = parsed.Select(a => a.PermissionId).Distinct().ToList();
 
         _db.UserPermissions.RemoveRange(user.UserPermissions);
         foreach (var assignment in parsed)
@@ -248,13 +282,20 @@ public sealed class RoleAdminService : IRoleAdminService
     private readonly IPermissionCache _cache;
     private readonly IAuditWriter _audit;
     private readonly IRbacActor _actor;
+    private readonly AssignmentGuard _guard;
 
-    public RoleAdminService(IRbacDbContext db, IPermissionCache cache, IAuditWriter audit, IRbacActor actor)
+    public RoleAdminService(
+        IRbacDbContext db,
+        IPermissionCache cache,
+        IAuditWriter audit,
+        IRbacActor actor,
+        AssignmentGuard guard)
     {
         _db = db;
         _cache = cache;
         _audit = audit;
         _actor = actor;
+        _guard = guard;
     }
 
     public async Task<PagedResult<RoleDto>> ListAsync(string? search, int page, int pageSize, CancellationToken cancellationToken = default)
@@ -327,6 +368,11 @@ public sealed class RoleAdminService : IRoleAdminService
             return Result.Fail<RoleDto>("Role not found.", "not_found");
         }
 
+        if (role.IsSystemRole && !request.IsActive)
+        {
+            return Result.Fail<RoleDto>(PrivilegeRules.SystemRoleActiveLocked, "forbidden");
+        }
+
         role.Name = request.Name.Trim();
         role.Description = request.Description?.Trim();
         role.IsActive = request.IsActive;
@@ -370,18 +416,24 @@ public sealed class RoleAdminService : IRoleAdminService
             return Result.Fail("Role not found.", "not_found");
         }
 
+        if (role.IsSystemRole)
+        {
+            return Result.Fail(PrivilegeRules.SystemRoleImmutable, "forbidden");
+        }
+
         var parsed = UserAdminService.ParseAssignments(assignments, out var error);
         if (error is not null)
         {
             return Result.Fail(error, "validation");
         }
 
-        var ids = parsed.Select(a => a.PermissionId).Distinct().ToList();
-        var validCount = await _db.Permissions.CountAsync(p => ids.Contains(p.Id) && !p.IsDeleted, cancellationToken);
-        if (validCount != ids.Count)
+        var grantable = await _guard.EnsureCanGrantPermissionsAsync(parsed, cancellationToken);
+        if (!grantable.IsSuccess)
         {
-            return Result.Fail("One or more permissions were not found.", "not_found");
+            return grantable;
         }
+
+        var ids = parsed.Select(a => a.PermissionId).Distinct().ToList();
 
         _db.RolePermissions.RemoveRange(role.RolePermissions);
         foreach (var assignment in parsed)
@@ -419,12 +471,14 @@ public sealed class PermissionAdminService : IPermissionAdminService
     private readonly IRbacDbContext _db;
     private readonly IAuditWriter _audit;
     private readonly IRbacActor _actor;
+    private readonly IPermissionCache _cache;
 
-    public PermissionAdminService(IRbacDbContext db, IAuditWriter audit, IRbacActor actor)
+    public PermissionAdminService(IRbacDbContext db, IAuditWriter audit, IRbacActor actor, IPermissionCache cache)
     {
         _db = db;
         _audit = audit;
         _actor = actor;
+        _cache = cache;
     }
 
     public async Task<PagedResult<PermissionDto>> ListAsync(string? search, int page, int pageSize, CancellationToken cancellationToken = default)
@@ -504,11 +558,17 @@ public sealed class PermissionAdminService : IPermissionAdminService
             return Result.Fail<PermissionDto>("Permission not found.", "not_found");
         }
 
+        if (permission.IsSystemPermission && !request.IsActive)
+        {
+            return Result.Fail<PermissionDto>(PrivilegeRules.SystemPermissionLocked, "forbidden");
+        }
+
         permission.Name = request.Name.Trim();
         permission.Description = request.Description?.Trim();
         permission.IsActive = request.IsActive;
         permission.Touch(_actor.Name);
         await _db.SaveChangesAsync(cancellationToken);
+        await _cache.InvalidateAllAsync(cancellationToken);
         await _audit.WriteAsync(AuditEventType.PermissionUpdated, nameof(RbacPermission), id, null, permission.Name, cancellationToken);
         return Result.Ok(permission.ToDto());
     }
@@ -528,6 +588,7 @@ public sealed class PermissionAdminService : IPermissionAdminService
 
         permission.MarkDeleted(_actor.Name);
         await _db.SaveChangesAsync(cancellationToken);
+        await _cache.InvalidateAllAsync(cancellationToken);
         return Result.Ok();
     }
 }

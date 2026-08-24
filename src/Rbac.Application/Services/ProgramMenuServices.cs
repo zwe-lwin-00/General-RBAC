@@ -299,6 +299,11 @@ public sealed class CurrentUserQuery : ICurrentUserQuery
             return Result.Fail<MeDto>("User not found.", "not_found");
         }
 
+        if (!user.IsActive)
+        {
+            return Result.Fail<MeDto>("User is inactive.", "forbidden");
+        }
+
         var permissions = await _authorization.GetEffectivePermissionsAsync(userId, cancellationToken: cancellationToken);
         var menus = await GetVisibleMenusAsync(userId, cancellationToken);
         return Result.Ok(new MeDto

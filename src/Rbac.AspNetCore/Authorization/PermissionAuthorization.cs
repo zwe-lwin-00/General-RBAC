@@ -14,7 +14,7 @@ public sealed class AuthorizePermissionAttribute : AuthorizeAttribute
 {
     public AuthorizePermissionAttribute(string permission)
     {
-        Policy = PermissionPolicyProvider.PolicyName(permission);
+        Policy = PermissionPolicyProvider.PolicyName(permission.Trim());
         Permission = permission;
     }
 

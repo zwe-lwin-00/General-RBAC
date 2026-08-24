@@ -26,6 +26,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = demoAuth.Issuer,
             ValidAudience = demoAuth.Audience,
             IssuerSigningKey = signingKey,
+            ValidateLifetime = true,
+            RequireSignedTokens = true,
+            RequireExpirationTime = true,
             ClockSkew = TimeSpan.FromMinutes(1),
             NameClaimType = JwtRegisteredClaimNames.UniqueName,
             RoleClaimType = "role"
@@ -60,18 +63,50 @@ builder.Services.AddRbac(
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("sample", policy =>
-        policy.AllowAnyHeader()
+        policy.WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
+            .AllowAnyHeader()
             .AllowAnyMethod()
-            .AllowCredentials()
-            .SetIsOriginAllowed(_ => true));
+            .AllowCredentials());
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("login", httpContext =>
+        System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
 });
 
 builder.Services.AddSingleton(signingKey);
 builder.Services.AddEndpointsApiExplorer();
 
+if (demoAuth.SigningKey.Length < 32)
+{
+    throw new InvalidOperationException("DemoAuth:SigningKey must be at least 32 characters.");
+}
+
 var app = builder.Build();
 
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Headers.XContentTypeOptions = "nosniff";
+        context.Response.Headers.XFrameOptions = "DENY";
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        context.Response.Headers["Cache-Control"] = "no-store";
+        return Task.CompletedTask;
+    });
+    await next();
+});
 app.UseCors("sample");
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRbac();
@@ -80,9 +115,15 @@ app.MapPost("/api/auth/login", (LoginRequest request, IConfiguration config) =>
 {
     var users = config.GetSection("DemoAuth:Users").Get<DemoUser[]>() ?? [];
     var user = users.FirstOrDefault(u =>
-        string.Equals(u.Username, request.Username, StringComparison.OrdinalIgnoreCase) &&
-        u.Password == request.Password);
-    if (user is null)
+        string.Equals(u.Username, request.Username, StringComparison.OrdinalIgnoreCase));
+    var expected = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+        System.Text.Encoding.UTF8.GetBytes(user?.Password ?? "missing-user-dummy-password")));
+    var provided = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+        System.Text.Encoding.UTF8.GetBytes(request.Password ?? string.Empty)));
+    var expectedBytes = System.Text.Encoding.UTF8.GetBytes(expected);
+    var providedBytes = System.Text.Encoding.UTF8.GetBytes(provided);
+    if (user is null ||
+        !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(expectedBytes, providedBytes))
     {
         return Results.Json(new { error = "Invalid username or password." }, statusCode: StatusCodes.Status401Unauthorized);
     }
@@ -110,7 +151,7 @@ app.MapPost("/api/auth/login", (LoginRequest request, IConfiguration config) =>
         username = user.Username,
         displayName = user.DisplayName
     });
-}).AllowAnonymous();
+}).AllowAnonymous().RequireRateLimiting("login");
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 

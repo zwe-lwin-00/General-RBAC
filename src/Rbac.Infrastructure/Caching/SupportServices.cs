@@ -13,6 +13,7 @@ public sealed class MemoryPermissionCache : IPermissionCache
 {
     private readonly IMemoryCache _cache;
     private readonly RbacOptions _options;
+    private int _generation;
     private static readonly TimeSpan DefaultDuration = TimeSpan.FromMinutes(5);
 
     public MemoryPermissionCache(IMemoryCache cache, IOptions<RbacOptions> options)
@@ -23,14 +24,19 @@ public sealed class MemoryPermissionCache : IPermissionCache
 
     public Task<IReadOnlySet<string>?> GetAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        _cache.TryGetValue(Key(userId), out IReadOnlySet<string>? value);
-        return Task.FromResult(value);
+        if (_cache.TryGetValue(Key(userId), out IReadOnlySet<string>? value) && value is not null)
+        {
+            return Task.FromResult<IReadOnlySet<string>?>(new HashSet<string>(value, StringComparer.OrdinalIgnoreCase));
+        }
+
+        return Task.FromResult<IReadOnlySet<string>?>(null);
     }
 
     public Task SetAsync(Guid userId, IReadOnlySet<string> permissions, CancellationToken cancellationToken = default)
     {
         var duration = _options.PermissionCacheDuration <= TimeSpan.Zero ? DefaultDuration : _options.PermissionCacheDuration;
-        _cache.Set(Key(userId), permissions, duration);
+        var copy = new HashSet<string>(permissions, StringComparer.OrdinalIgnoreCase);
+        _cache.Set(Key(userId), (IReadOnlySet<string>)copy, duration);
         return Task.CompletedTask;
     }
 
@@ -50,7 +56,13 @@ public sealed class MemoryPermissionCache : IPermissionCache
         return Task.CompletedTask;
     }
 
-    private static string Key(Guid userId) => $"rbac:permissions:user:{userId:D}";
+    public Task InvalidateAllAsync(CancellationToken cancellationToken = default)
+    {
+        Interlocked.Increment(ref _generation);
+        return Task.CompletedTask;
+    }
+
+    private string Key(Guid userId) => $"rbac:permissions:{_generation}:user:{userId:D}";
 }
 
 public sealed class EfAuditWriter : IAuditWriter
@@ -94,4 +106,5 @@ public sealed class SystemRbacActor : IRbacActor
     public Guid? UserId => null;
     public string? IpAddress => null;
     public string? CorrelationId => null;
+    public bool IsSystemProcess => true;
 }
