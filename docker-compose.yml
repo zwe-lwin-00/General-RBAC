@@ -15,10 +15,10 @@ services:
       - "5265:8080"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 12
-      start_period: 25s
+      start_period: 40s
     restart: unless-stopped
 
   web:

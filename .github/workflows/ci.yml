@@ -36,12 +36,28 @@ jobs:
       - name: Build images
         run: docker compose build
       - name: Start stack
-        run: docker compose up -d --wait --wait-timeout 120
-      - name: Check API through nginx and published port
+        run: docker compose up -d
+      - name: Wait for API health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:5265/api/health; then
+              exit 0
+            fi
+            echo "waiting for api ($i/60)"
+            sleep 2
+          done
+          echo "API did not become healthy"
+          docker compose ps -a
+          docker compose logs
+          exit 1
+      - name: Check nginx proxy and UI
         run: |
           curl -fsS http://localhost:8080/api/health
-          curl -fsS http://localhost:5265/api/health
-          curl -fsS -o /dev/null -w "%{http_code}" http://localhost:8080/ | grep -q 200
+          code=$(curl -fsS -o /dev/null -w "%{http_code}" http://localhost:8080/)
+          test "$code" = "200"
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose ps -a && docker compose logs
       - name: Stop stack
         if: always()
         run: docker compose down -v

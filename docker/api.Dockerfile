@@ -18,22 +18,20 @@ RUN dotnet publish samples/Rbac.Sample.Api/Rbac.Sample.Api.csproj -c Release -o 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl gosu \
+    && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /app/data \
-    && chown -R $APP_UID:$APP_UID /app/data
+    && mkdir -p /app/data
 
 COPY --from=build /app/publish .
-COPY docker/api-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN chown -R $APP_UID:$APP_UID /app
+USER $APP_UID
 
 ENV ASPNETCORE_URLS=http://+:8080 \
     ASPNETCORE_ENVIRONMENT=Production \
     ConnectionStrings__Sqlite="Data Source=/app/data/rbac.sample.db"
 
 EXPOSE 8080
-HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=12 \
+HEALTHCHECK --interval=5s --timeout=5s --start-period=40s --retries=12 \
     CMD curl -fsS http://127.0.0.1:8080/api/health || exit 1
 
-# Entrypoint starts as root so it can chown the SQLite volume, then drops to $APP_UID.
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["dotnet", "Rbac.Sample.Api.dll"]
