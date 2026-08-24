@@ -44,13 +44,27 @@ docs/                      architecture and ERD
 ## Quick start (Docker)
 
 ```bash
+git pull
 docker compose up --build
-# or: make docker
+# or: make docker          # detached, then runs a smoke test
+# or: make docker-reset    # wipe SQLite and start clean
 ```
 
 Open http://localhost:8080 — nginx serves the React console and proxies `/api` to the .NET API.
 
+| Username | Password | What you should see |
+| --- | --- | --- |
+| `officer` | `Passw0rd!` | Create passengers, no export, no admin |
+| `viewer` | `Passw0rd!` | Read only |
+| `supervisor` | `Passw0rd!` | Passenger + report export |
+| `john` | `Passw0rd!` | Same as supervisor except **report.export is denied** |
+| `admin` | `Passw0rd!` | Admin catalog + passengers |
+| `superadmin` | `Passw0rd!` | Full `rbac.*` catalog |
+
+Best first pass: `officer` (buttons gated), then `john` vs `supervisor` on Reports, then `superadmin` (Administration).
+
 ```bash
+make docker-test    # API permission smoke test
 docker compose down
 ```
 
@@ -68,16 +82,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173
-
-| Username | Password | What you should see |
-| --- | --- | --- |
-| `officer` | `Passw0rd!` | Create passengers, no export, no admin |
-| `viewer` | `Passw0rd!` | Read only |
-| `supervisor` | `Passw0rd!` | Passenger + report export |
-| `john` | `Passw0rd!` | Same as supervisor except **report.export is denied** |
-| `admin` | `Passw0rd!` | Admin catalog + passengers |
-| `superadmin` | `Passw0rd!` | Full `rbac.*` catalog |
+Open http://localhost:5173. Same demo users as above.
 
 ## Use in another .NET API
 
